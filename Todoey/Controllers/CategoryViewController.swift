@@ -8,14 +8,20 @@
 
 import UIKit
 
-import CoreData
+import RealmSwift
+
+import ChameleonFramework
 
 
-class CategoryViewController: UITableViewController {
+class CategoryViewController: SwipeTableViewController {
     
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    let realm = try! Realm()
     
-    var categories = [Category]()
+    var categories : Results<Category>?
+    
+
+
+    
     
     
     
@@ -25,23 +31,29 @@ class CategoryViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-      loadCategorys()
+      loadCategories()
+    
+        tableView.separatorStyle = .none
+       
     }
 
     
     //Mark: - TableView DataSource Methods
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return categories.count
+        return categories?.count ?? 1
+        
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
+//        let cell = tableView.dequeueReusableCell(withIdentifier: "categoryCell", for: indexPath) as! SwipeTableViewCell
         
-        let cell = tableView.dequeueReusableCell(withIdentifier: "categoryCell", for: indexPath)
+       cell.textLabel?.text = categories?[indexPath.row].name ?? "No categories added yet"
         
-        let category = categories[indexPath.row]
+        cell.backgroundColor = UIColor(hexString: categories?[indexPath.row].color ?? "1D9BF6")
+//        cell.delegate = self
         
-            cell.textLabel?.text = category.name
         
         return cell
         
@@ -62,7 +74,7 @@ class CategoryViewController: UITableViewController {
         
         if let indexPath = tableView.indexPathForSelectedRow {
            
-            destinationVC.selectedCategory = categories[indexPath.row]
+            destinationVC.selectedCategory = categories?[indexPath.row]
             
         }
         
@@ -87,14 +99,15 @@ class CategoryViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Category", style: .default) { (action) in
             
-            let newCategory = Category(context: self.context)
+            let newCategory = Category()
             
                 newCategory.name = textFiled.text!
-                newCategory.done = false
+                newCategory.color = UIColor.randomFlat.hexValue()
+//
             
-            self.categories.append(newCategory)
             
-            self.saveCategorys()
+            
+            self.save(category: newCategory)
             
             
         }
@@ -112,10 +125,12 @@ class CategoryViewController: UITableViewController {
         
     }
     
-    func saveCategorys() {
+    func save(category: Category) {
         
         do{
-            try context.save()
+            try realm.write {
+                realm.add(category)
+            }
     
         } catch {
             print("error saving context \(error)")
@@ -123,16 +138,35 @@ class CategoryViewController: UITableViewController {
             self.tableView.reloadData()
     }
     
-    func loadCategorys(with request: NSFetchRequest<Category> = Category.fetchRequest()) {
+    func loadCategories() {
+            categories = realm.objects(Category.self)
+   
+    }
+
+    
+    override func updateModel(at indexPath: IndexPath) {
+        super.updateModel(at: indexPath)
         
-        do{
-            categories = try context.fetch(request)
-        } catch {
-            print("error finding data to context \(error)")
+        if let categoryForDeletion = self.categories? [indexPath.row] {
+            do{
+                try self.realm.write {
+                    try self.realm.delete([categoryForDeletion])
+                }
+            }catch{
+                print("Can not delete, \(error)")
+            }
+
         }
-        tableView.reloadData() 
     }
     
+//
     
     //Mark: - TableView Delegate Methods
 }
+
+//Mark: - Swipe cell delegate methods
+
+
+    
+    
+
